@@ -94,7 +94,23 @@ public class RabbitmqProducer extends AbstractProducer {
 		String routingKey = this.topicInterpolator.generateFromRowMap(r);
 		routingKey = generateForOldTemplate(routingKey, r);
 
-		channel.basicPublish(exchangeName, routingKey, props, value.getBytes());
+		try {
+			channel.basicPublish(exchangeName, routingKey, props, value.getBytes());
+			this.succeededMessageCount.inc();
+			this.succeededMessageMeter.mark();
+		} catch (Exception e) {
+			this.failedMessageCount.inc();
+			this.failedMessageMeter.mark();
+
+			LOGGER.error(e.getClass().getSimpleName() + " @ " + r.getNextPosition());
+			LOGGER.error(e.getLocalizedMessage());
+
+			throw e;
+			// if ( !this.context.getConfig().ignoreProducerError ) {
+			// 	this.context.terminate(new RuntimeException(e));
+			// }
+		}
+
 		if ( r.isTXCommit() ) {
 			context.setPosition(r.getNextPosition());
 		}
